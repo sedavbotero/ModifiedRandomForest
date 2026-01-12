@@ -11,8 +11,18 @@ def sample_data(
     y: pd.Series,
     number_of_rows: int,
     number_of_columns: int,
-    probs=None,
+    probs: np.typing.ArrayLike | None = None,
 ) -> tuple[pd.DataFrame, pd.Series]:
+    """
+    Funkcja odpowiedzialna za losowe próbkowanie zbioru danych.
+    :param X: Ramka danych z cechami
+    :param y: zmienna celu
+    :param number_of_rows: liczba wierszy w X
+    :param number_of_columns: liczba kolumn w X
+    :param probs: dyskretny rozkład prawdopodobieństwa na wierszach X.
+     Jeśli None to zostanie użyty rozkład jednostajny. Patrz argument p w numpy.random.choice
+    :return: Zwraca spróbkowane X, y
+    """
     rows = np.random.choice(X.index.to_numpy(), number_of_rows, replace=True, p=probs)
     cols = np.random.choice(X.columns.to_numpy(), number_of_columns, replace=False)
     X_sampled = X.loc[rows, cols]
@@ -21,7 +31,23 @@ def sample_data(
 
 
 class ModifiedRandomForest:
+    """
+    Zmodyfikowana wersja algorytmu lasu losowego.
+    Modyfikacja polega na zmodyfikowaniu bootstrapu tak, aby prawdopodobieństwo
+    wylosowania n-tego wiersza jest proporcjonalne do err^ex, gdzie err to
+    wartość bezwzględna n-tego residuum.
+    ex jest wykładnikiem, który startuje z wartością 0,001 i jest w każdej iteracji zwiększana
+    1.01^gamma-krotnie, aż osiągnie wartość max_exponent, gdzie gamma i max_exponent
+    to hiperparametry modelu
+    """
+
     def __init__(self, n_estimators, gamma=1.0, max_exponent=10.0, **kwargs):
+        """
+        :param n_estimators: liczba drzew decyzyjnych wytrenowanych w modelu
+        :param gamma: hiperparametr użyty przy trenowaniu
+        :param max_exponent: hiperparametr użyty przy trenowaniu
+        :param kwargs: argumenty przekazywane do konstruktora drzew decyzyjnych
+        """
         self.n_estimators = n_estimators  # hiperparametr
         self.gamma = gamma  # hiperparametr
         self.max_exponent = max_exponent  # hiperparametr
@@ -30,7 +56,11 @@ class ModifiedRandomForest:
         self.estimator_features = []
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> None:
-
+        """
+        Metoda dopasowująca model do danych
+        :param X: Ramka danych z cechami
+        :param y: Zmienna celu
+        """
         self.estimators = []
         self.estimator_features = []
 
@@ -69,78 +99,21 @@ class ModifiedRandomForest:
             errors = np.absolute(y - predictions_train)
 
     def predict(self, X: pd.DataFrame) -> pd.Series:
+        """
+        :param X: Ramka danych z cechami
+        :return: Predykcje dla danych X
+        """
         predictions = np.zeros(X.shape[0])
         for tree, features in zip(self.estimators, self.estimator_features):
             predictions += tree.predict(X.loc[:, features])
         return predictions / self.n_estimators
 
     def score(self, X: pd.DataFrame, y: pd.Series) -> float:
+        """
+        Metoda licząca metrykę R^2 dla wytrenowanego modelu
+        :param X: Ramka danych z cechami
+        :param y: Zmienna celu
+        :return: Wartość metryki R^2
+        """
         y_pred = self.predict(X)
         return r2_score(y, y_pred)
-
-
-## Proste sprawdzenie
-from sklearn.model_selection import train_test_split
-from scipy.io import arff
-from sklearn.model_selection import KFold
-from sklearn.metrics import mean_squared_error
-from sklearn.datasets import load_diabetes
-from sklearn.ensemble import RandomForestRegressor
-
-
-def main():
-    # X, y = load_diabetes(return_X_y=True, as_frame=True)
-
-    arff_file = arff.loadarff("dataset_2204_house_8L.arff")
-    df = pd.DataFrame(arff_file[0])
-    X = df.iloc[:, :-1]
-    y = df.iloc[:, -1]
-
-    # print(X)
-    # print(y)
-
-    def cross_val_score(modelClass, **param_kwargs):
-        splitter = KFold(n_splits=5, shuffle=True)
-        scores = []
-        for i, (train_index, test_index) in enumerate(splitter.split(X, y)):
-            model = modelClass(**param_kwargs)
-            model.fit(X.iloc[train_index], y.iloc[train_index])
-            y_pred = model.predict(X.iloc[test_index])
-            score = r2_score(y.iloc[test_index], y_pred)
-            scores.append(score)
-        return sum(scores) / len(scores)
-
-    params = {
-        "n_estimators": 10,
-        # "gamma": best_params["gamma"],
-        "gamma": 2,
-        # "max_exponent": best_params["max_exponent"],
-        "max_exponent": 90,
-    }
-    model = ModifiedRandomForest(**params)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
-    model.fit(X_train, y_train)
-    random_forest = RandomForestRegressor(n_estimators=params["n_estimators"])
-    random_forest.fit(X_train, y_train)
-    print("train scores:")
-    print("my mse", mean_squared_error(y_train, model.predict(X_train)))
-    print("sklearn mse", mean_squared_error(y_train, random_forest.predict(X_train)))
-    print("my r2", r2_score(y_train, model.predict(X_train)))
-    print("sklearn r2", r2_score(y_train, random_forest.predict(X_train)))
-    print("test scores:")
-    print("my mse", mean_squared_error(y_test, model.predict(X_test)))
-    print("sklearn mse", mean_squared_error(y_test, random_forest.predict(X_test)))
-    print("my r2", r2_score(y_test, model.predict(X_test)))
-    print("sklearn r2", r2_score(y_test, random_forest.predict(X_test)))
-    # print(
-    #     "cross val score my rf",
-    #     cross_val_score(ModifiedRandomForest, **params),
-    # )
-    # print(
-    #     "cross val score my rf",
-    #     cross_val_score(RandomForestRegressor, n_estimators=params["n_estimators"]),
-    # )
-
-
-if __name__ == "__main__":
-    main()

@@ -13,3 +13,4 @@ pyvenv.cfg
 pip-selfcheck.json
 
 .idea
+/dataset_2204_house_8L.arff

@@ -1,10 +1,18 @@
 import numpy as np
-
+from typing import Any
 from sklearn.metrics import mean_squared_error
 
 
 class DecisionNode:
+    """
+    Klasa reprezentująca wierzchołek drzewa decyzyjnego
+    """
+
     def __init__(self, feature, split_point):
+        """
+        :param feature: Cecha związana z tym wierzchołkiem
+        :param split_point: Granica decyzyjna dla cechy
+        """
         self.feature = feature
         self.split_point = split_point
         self.left = None
@@ -13,13 +21,24 @@ class DecisionNode:
         self.drop_column = None
 
     @staticmethod
-    def make_leaf(value) -> "DecisionNode":
+    def make_leaf(value: Any) -> "DecisionNode":
+        """
+        Statyczna metoda tworząca liść drzewa decyzyjnego
+        :param value: Wartość predykcji związanej z tym liściem
+        :return: Zwraca nowo utworzony liść
+        """
         dn = DecisionNode(None, None)
         dn.leaf_value = value
         return dn
 
 
-def parse_tree(node: DecisionNode, x: np.ndarray):
+def parse_tree(node: DecisionNode, x: np.ndarray) -> Any:
+    """
+    Metoda przechodząca rekurencyjnie po drzewie dla ustalonej obserwacji i wyznaczająca predykcję
+    :param node: korzeń drzewa bądź poddrzewa
+    :param x: obserwacja (wektor cech)
+    :return: predykcja dla obserwacji x
+    """
     if node.leaf_value is not None:
         return node.leaf_value
     new_x = np.delete(x, node.drop_column) if node.drop_column is not None else x
@@ -30,6 +49,10 @@ def parse_tree(node: DecisionNode, x: np.ndarray):
 
 
 class DecisionTreeRegressor:
+    """
+    Własna implementacja drzewa decyzyjnego do zadania regresji
+    """
+
     def __init__(
         self,
         max_depth: int | None = None,
@@ -38,6 +61,13 @@ class DecisionTreeRegressor:
         min_impurity_decrease: float = 0.0,
         max_bins: int | float = 100,
     ):
+        """
+        :param max_depth: Maksymalna głębokość drzewa
+        :param min_samples_split: Minimalna liczba obserwacji potrzebna do dokonania podziału
+        :param min_samples_leaf: Minimalna liczba obserwacji w liściu
+        :param min_impurity_decrease: Minimalny spadek miary nieczystości (MSE) potrzebny do dokonania podziału
+        :param max_bins: Maksymalna liczba binów do histogramów
+        """
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
@@ -47,6 +77,15 @@ class DecisionTreeRegressor:
     def recursively_build_decision_tree(
         self, X: np.ndarray, y: np.ndarray, histograms: list[np.ndarray], depth: int = 0
     ) -> DecisionNode | None:
+        """
+        Funkcja rekurencyjna wyliczająca wierzchołki drzewa decyzyjnego
+        :param X: Macierz cech
+        :param y: Wektor zmiennej celu
+        :param histograms: lista z histogramami cech. N-ty element listy odpowiada n-tej cesze.
+         Histogramy są wykorzystywane do wyznaczania granic decyzyjnych
+        :param depth: Poziom rekurencji w drzewie. Parametr potrzebny do ograniczania głębokości drzew
+        :return: Zwraca dopasowane drzewo, bądź poddrzewo
+        """
         assert X.ndim == 2
         assert y.ndim == 1
         assert X.shape[0] == y.shape[0]
@@ -111,7 +150,12 @@ class DecisionTreeRegressor:
         )
         return node
 
-    def fit(self, X: np.typing.ArrayLike, y: np.typing.ArrayLike):
+    def fit(self, X: np.typing.ArrayLike, y: np.typing.ArrayLike) -> None:
+        """
+        Metoda dopasowująca model do danych
+        :param X: Tabelarycznie ustrukturyzowane cechy
+        :param y: Zmienna celu podana w postaci wektoropodobnej
+        """
         X = np.array(X)
         y = np.array(y)
         assert y.ndim == 1
@@ -131,6 +175,10 @@ class DecisionTreeRegressor:
         self.model = dt
 
     def predict(self, X: np.typing.ArrayLike) -> np.ndarray:
+        """
+        :param X: Tabelarycznie ustrukturyzowane cechy
+        :return: Zwraca wektor predykcji o długości równej liczbie wierszy w X
+        """
         X = np.array(X)
         assert X.ndim == 2
         preds = np.array([parse_tree(self.model, X[i, :]) for i in range(X.shape[0])])
